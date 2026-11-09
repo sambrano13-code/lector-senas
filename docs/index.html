@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lector de Lengua de Señas</title>
+<meta name="description" content="Traductor de Lengua de Señas Argentina a texto y voz, en el navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root { --fondo:#0f1020; --panel:#1a1b33; --texto:#f4f4fb; --suave:#a9abc9; --acento:#b46cff; --ok:#7dffa0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fondo); color:var(--texto); font-family:Inter,system-ui,sans-serif; }
+  header { max-width:980px; margin:0 auto; padding:24px 16px 8px; }
+  h1 { margin:0; font-size:clamp(24px,4vw,36px); font-weight:800; }
+  h1 span { color:var(--acento); }
+  header p { margin:6px 0 0; color:var(--suave); }
+  main { max-width:980px; margin:0 auto; padding:12px 16px 32px; }
+  .escena { position:relative; width:100%; aspect-ratio:16/9; background:#000; border-radius:18px; overflow:hidden; box-shadow:0 10px 40px #0008; }
+  canvas { width:100%; height:100%; display:block; }
+  .subtitulo { position:absolute; left:0; right:0; bottom:0; padding:18px 16px 22px; text-align:center;
+    background:linear-gradient(transparent, #000c 35%); font-weight:800; font-size:clamp(22px,5vw,52px); min-height:1.6em; }
+  .diag { position:absolute; top:12px; left:12px; background:#000a; padding:8px 12px; border-radius:10px; font-size:14px; line-height:1.6; }
+  .diag b { color:var(--ok); }
+  .inicio { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:#0f1020ee; text-align:center; padding:16px; }
+  button { background:var(--acento); color:#fff; border:0; border-radius:999px; padding:12px 22px; font:600 16px Inter,sans-serif; cursor:pointer; }
+  button.sec { background:var(--panel); color:var(--texto); }
+  .controles { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+  .info { margin-top:22px; display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .tarjeta { background:var(--panel); border-radius:14px; padding:16px; color:var(--suave); font-size:15px; line-height:1.5; }
+  .tarjeta h3 { margin:0 0 6px; color:var(--texto); font-size:16px; }
+  footer { text-align:center; color:var(--suave); font-size:14px; padding:8px 16px 28px; }
+  footer a { color:var(--acento); }
+  #estado { color:var(--suave); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤟 Lector de <span>Lengua de Señas</span></h1>
+  <p>Traduce Lengua de Señas Argentina a texto y voz, en vivo, desde tu navegador.</p>
+</header>
+<main>
+  <div class="escena">
+    <canvas id="lienzo" width="1280" height="720"></canvas>
+    <div class="diag" id="diag" hidden></div>
+    <div class="subtitulo" id="subtitulo"></div>
+    <div class="inicio" id="inicio">
+      <p>Necesita acceso a la cámara. Las imágenes se procesan en tu dispositivo y no se envían a ningún lado.</p>
+      <button id="btnIniciar">Activar cámara</button>
+      <p id="estado"></p>
+    </div>
+  </div>
+  <div class="controles">
+    <button class="sec" id="btnBorrar">Borrar texto</button>
+    <button class="sec" id="btnDiag">Ver diagnóstico</button>
+    <button class="sec" id="btnVoz">🔊 Voz: activada</button>
+  </div>
+  <div class="info">
+    <div class="tarjeta"><h3>Qué reconoce</h3>El abecedario completo (con Ñ) y las palabras Hola, Mi nombre es, Gracias, Sí, No, Por favor y Chau.</div>
+    <div class="tarjeta"><h3>Deletreo</h3>Las letras se van juntando. Al bajar la mano, se lee la palabra completa: "Hola, mi nombre es R-O-M-I-N-A".</div>
+    <div class="tarjeta"><h3>Cómo funciona</h3>MediaPipe detecta manos, cuerpo y movimiento; un modelo entrenado con ejemplos propios identifica la seña.</div>
+  </div>
+</main>
+<footer>Hecho por <a href="https://linkedin.com/in/romina-sambrano" target="_blank">Romina Sambrano</a> · <a href="https://github.com/sambrano13-code/lector-senas" target="_blank">Código en GitHub</a></footer>
+
+<script type="module">
+import { FilesetResolver, HandLandmarker, PoseLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+
+const URL_WASM = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+const URL_MANOS = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task";
+const URL_CUERPO = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task";
+
+const CUADROS_ESTABLES = 8, CONFIANZA_MINIMA = 0.5, K = 9;
+const CUADROS_CERRAR_PALABRA = 20, CUADROS_BORRAR = 150;
+const CONEXIONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const CONEXIONES_CUERPO = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[9,10]];
+
+const lienzo = document.getElementById("lienzo"), ctx = lienzo.getContext("2d");
+const elSub = document.getElementById("subtitulo"), elDiag = document.getElementById("diag");
+const estado = document.getElementById("estado");
+let datos, manosDet, cuerpoDet, video, verDiag = false, vozActiva = true;
+
+// ---------- Características (igual que comun.py) ----------
+const tamanoMano = m => Math.max(Math.hypot(m[9].x - m[0].x, m[9].y - m[0].y), 1e-6);
+function normalizar(m) {
+  const p = m.map(q => [q.x - m[0].x, q.y - m[0].y]);
+  const esc = Math.max(...p.map(([x, y]) => Math.hypot(x, y)));
+  return p.flatMap(([x, y]) => esc > 0 ? [x / esc, y / esc] : [x, y]);
+}
+const historia = [];
+function caracteristicas(manos, cuerpo) {
+  if (!manos.length) { historia.length = 0; return null; }
+  const porLado = {};
+  for (const [m, lado] of manos) if (!(lado in porLado)) porLado[lado] = m;
+  const v = [];
+  for (const lado of ["Left", "Right"]) {
+    if (porLado[lado]) { v.push(...normalizar(porLado[lado]), 1); } else { v.push(...Array(42).fill(0), 0); }
+  }
+  if (porLado.Left && porLado.Right) {
+    const izq = porLado.Left, der = porLado.Right, esc = (tamanoMano(izq) + tamanoMano(der)) / 2;
+    v.push((der[0].x - izq[0].x) / esc, (der[0].y - izq[0].y) / esc);
+  } else v.push(0, 0);
+  const pr = porLado.Right || porLado.Left, esc = tamanoMano(pr);
+  const actual = [pr[0].x, pr[0].y, pr[8].x, pr[8].y];
+  historia.push(actual); if (historia.length > 16) historia.shift();
+  for (const atras of [15, 10, 5]) {
+    if (historia.length > atras) { const pas = historia[historia.length - 1 - atras]; v.push(...actual.map((a, i) => (a - pas[i]) / esc)); }
+    else v.push(0, 0, 0, 0);
+  }
+  if (cuerpo) {
+    const hi = cuerpo[11], hd = cuerpo[12], nar = cuerpo[0];
+    const cx = (hi.x + hd.x) / 2, cy = (hi.y + hd.y) / 2, an = Math.max(Math.hypot(hi.x - hd.x, hi.y - hd.y), 1e-6);
+    for (const lado of ["Left", "Right"]) {
+      const m = porLado[lado];
+      if (m) v.push((m[0].x - cx) / an, (m[0].y - cy) / an, (m[8].x - cx) / an, (m[8].y - cy) / an, (m[8].x - nar.x) / an, (m[8].y - nar.y) / an);
+      else v.push(0, 0, 0, 0, 0, 0);
+    }
+    v.push(1);
+  } else v.push(...Array(13).fill(0));
+  return v;
+}
+
+// ---------- Clasificador (K vecinos más cercanos) ----------
+function clasificar(v) {
+  const z = v.map((x, i) => (x - datos.media[i]) / datos.desvio[i]);
+  const mejores = [];   // [distancia, etiqueta]
+  for (let f = 0; f < datos.X.length; f++) {
+    const fila = datos.X[f]; let d = 0;
+    for (let i = 0; i < z.length; i++) { const t = fila[i] - z[i]; d += t * t; }
+    if (mejores.length < K || d < mejores[mejores.length - 1][0]) {
+      mejores.push([d, datos.y[f]]); mejores.sort((a, b) => a[0] - b[0]); if (mejores.length > K) mejores.pop();
+    }
+  }
+  const votos = {};
+  for (const [, e] of mejores) votos[e] = (votos[e] || 0) + 1;
+  return Object.entries(votos).map(([e, n]) => [datos.etiquetas[e], n / K]).sort((a, b) => b[1] - a[1]);
+}
+
+// ---------- Voz y subtítulos ----------
+function hablar(texto) {
+  if (!vozActiva) return;
+  const u = new SpeechSynthesisUtterance(texto);
+  const voces = speechSynthesis.getVoices();
+  u.voice = voces.find(x => x.lang === "es-AR") || voces.find(x => x.lang.startsWith("es")) || null;
+  u.lang = u.voice ? u.voice.lang : "es-AR";
+  speechSynthesis.speak(u);
+}
+const esLetra = s => s.length === 1;
+let frase = [], letras = "", ultimaSena = null, ultimas = [], sinMano = 0;
+function cerrarDeletreo() {
+  if (letras) { const p = letras[0] + letras.slice(1).toLowerCase(); frase.push(p); hablar(p); letras = ""; }
+}
+function actualizarSubtitulo() { elSub.textContent = [...frase, ...(letras ? [letras + "_"] : [])].join(" "); }
+
+// ---------- Dibujo ----------
+function dibujarCuerpo(c) {
+  const P = q => [q.x * lienzo.width, q.y * lienzo.height];
+  ctx.strokeStyle = ctx.fillStyle = "#50c8ff"; ctx.lineWidth = 4;
+  for (const [a, b] of CONEXIONES_CUERPO) { ctx.beginPath(); ctx.moveTo(...P(c[a])); ctx.lineTo(...P(c[b])); ctx.stroke(); }
+}
+function dibujarMano(m) {
+  const P = q => [q.x * lienzo.width, q.y * lienzo.height];
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 3;
+  for (const [a, b] of CONEXIONES) { ctx.beginPath(); ctx.moveTo(...P(m[a])); ctx.lineTo(...P(m[b])); ctx.stroke(); }
+  ctx.fillStyle = "#ff50b4";
+  for (const q of m) { ctx.beginPath(); ctx.arc(...P(q), 6, 0, 7); ctx.fill(); }
+}
+
+// ---------- Bucle principal ----------
+let ultimoTiempo = -1;
+function cuadro() {
+  // Imagen espejada y recortada a 16:9 (igual que en Python)
+  const vw = video.videoWidth, vh = video.videoHeight, W = lienzo.width, H = lienzo.height;
+  const escala = Math.max(W / vw, H / vh), dw = vw * escala, dh = vh * escala;
+  ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
+  ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh); ctx.restore();
+
+  let t = performance.now(); if (t <= ultimoTiempo) t = ultimoTiempo + 1; ultimoTiempo = t;
+  const rm = manosDet.detectForVideo(lienzo, t);
+  const rc = cuerpoDet.detectForVideo(lienzo, t);
+  const lados = rm.handedness || rm.handednesses || [];
+  const manos = (rm.landmarks || []).map((m, i) => [m, lados[i] && lados[i][0] ? lados[i][0].categoryName : "Right"]);
+  const cuerpo = rc.landmarks && rc.landmarks.length ? rc.landmarks[0] : null;
+
+  if (cuerpo) dibujarCuerpo(cuerpo);
+  for (const [m] of manos) dibujarMano(m);
+
+  const v = caracteristicas(manos, cuerpo);
+  if (v) {
+    sinMano = 0;
+    const pred = clasificar(v);
+    if (verDiag) elDiag.innerHTML = pred.slice(0, 3).map(([n, p], i) => i === 0 ? `<b>${n}: ${Math.round(p * 100)}%</b>` : `${n}: ${Math.round(p * 100)}%`).join("<br>");
+    ultimas.push(pred[0][1] >= CONFIANZA_MINIMA ? pred[0][0] : null);
+    if (ultimas.length > CUADROS_ESTABLES) ultimas.shift();
+    if (ultimas.length === CUADROS_ESTABLES && ultimas.every(x => x === ultimas[0])) {
+      const s = ultimas[0];
+      if (s && s !== ultimaSena) {
+        if (esLetra(s)) letras += s; else { cerrarDeletreo(); frase.push(s); hablar(s); }
+      }
+      ultimaSena = s;
+    }
+  } else {
+    sinMano++; ultimas = [];
+    if (verDiag) elDiag.innerHTML = "Sin manos";
+    if (sinMano === CUADROS_CERRAR_PALABRA) { cerrarDeletreo(); ultimaSena = null; }
+    if (sinMano === CUADROS_BORRAR) frase = [];
+  }
+  actualizarSubtitulo();
+  requestAnimationFrame(cuadro);
+}
+
+async function crear(Clase, vision, url, extra) {
+  try { return await Clase.createFromOptions(vision, { baseOptions: { modelAssetPath: url, delegate: "GPU" }, runningMode: "VIDEO", ...extra }); }
+  catch { return await Clase.createFromOptions(vision, { baseOptions: { modelAssetPath: url, delegate: "CPU" }, runningMode: "VIDEO", ...extra }); }
+}
+
+document.getElementById("btnIniciar").onclick = async () => {
+  try {
+    estado.textContent = "Cargando modelos…";
+    const [vision, resp] = await Promise.all([FilesetResolver.forVisionTasks(URL_WASM), fetch("datos.json")]);
+    datos = await resp.json();
+    manosDet = await crear(HandLandmarker, vision, URL_MANOS, { numHands: 2 });
+    cuerpoDet = await crear(PoseLandmarker, vision, URL_CUERPO, { numPoses: 1 });
+    estado.textContent = "Abriendo cámara…";
+    video = document.createElement("video"); video.playsInline = true; video.muted = true;
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false });
+    await video.play();
+    document.getElementById("inicio").hidden = true;
+    hablar("");  // habilita la voz en el celular
+    requestAnimationFrame(cuadro);
+  } catch (e) {
+    estado.textContent = "No se pudo iniciar: " + e.message;
+  }
+};
+document.getElementById("btnBorrar").onclick = () => { frase = []; letras = ""; ultimaSena = null; actualizarSubtitulo(); };
+document.getElementById("btnDiag").onclick = e => { verDiag = !verDiag; elDiag.hidden = !verDiag; e.target.textContent = verDiag ? "Ocultar diagnóstico" : "Ver diagnóstico"; };
+document.getElementById("btnVoz").onclick = e => { vozActiva = !vozActiva; e.target.textContent = vozActiva ? "🔊 Voz: activada" : "🔇 Voz: desactivada"; };
+</script>
+</body>
+</html>
