@@ -1,0 +1,10 @@
+.venv/
+venv/
+__pycache__/
+*.task
+*.txt
+datos_viejo.csv
+datos_mezclado.csv
+*_v1.py
+*_v2.py
+*_v3.py
