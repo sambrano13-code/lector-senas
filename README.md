@@ -32,8 +32,6 @@ python paso3_entrenar.py    # entrenar el modelo
 python paso4_lector.py      # lector en vivo
 ```
 
-Agregando un número al final se elige la cámara (ej: `python paso4_lector.py 1` para usar el iPhone como cámara).
-
 ## Archivos
 
 | Archivo | Qué hace |
@@ -54,6 +52,6 @@ Agregando un número al final se elige la cámara (ej: `python paso4_lector.py 1
 
 ## Autora
 
-**Romina Sambrano**: estudiante de la Tecnicatura Superior en Desarrollo de Software (Instituto Superior Blas Pascal), Técnica Superior en Emergencias Prehospitalarias.
+**Romina Sambrano**: estudiante de la Tecnicatura Superior en Desarrollo de Software.
 
 [LinkedIn](https://linkedin.com/in/romina-sambrano) · [GitHub](https://github.com/sambrano13-code)
