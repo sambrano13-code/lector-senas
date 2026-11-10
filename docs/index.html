@@ -168,7 +168,7 @@ function dibujarMano(m) {
 let ultimoTiempo = -1;
 function cuadro() {
   // Imagen espejada y recortada a 16:9 (igual que en Python)
-  const vw = video.videoWidth, vh = video.videoHeight, W = lienzo.width, H = lienzo.height;
+  if (lienzo.width !== video.videoWidth || lienzo.height !== video.videoHeight) { lienzo.width = video.videoWidth; lienzo.height = video.videoHeight; const e2 = document.querySelector(".escena"); e2.style.aspectRatio = video.videoWidth + " / " + video.videoHeight; e2.style.maxWidth = "calc(75vh * " + video.videoWidth + " / " + video.videoHeight + ")"; } const vw = video.videoWidth, vh = video.videoHeight, W = lienzo.width, H = lienzo.height;
   const escala = Math.max(W / vw, H / vh), dw = vw * escala, dh = vh * escala;
   ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1);
   ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh); ctx.restore();
@@ -221,7 +221,7 @@ document.getElementById("btnIniciar").onclick = async () => {
     cuerpoDet = await crear(PoseLandmarker, vision, URL_CUERPO, { numPoses: 1 });
     estado.textContent = "Abriendo cámara…";
     video = document.createElement("video"); video.playsInline = true; video.muted = true;
-    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
     await video.play(); lienzo.width = video.videoWidth; lienzo.height = video.videoHeight; const esc = document.querySelector(".escena"); esc.style.aspectRatio = video.videoWidth + " / " + video.videoHeight; esc.style.maxWidth = "calc(75vh * " + video.videoWidth + " / " + video.videoHeight + ")"; esc.style.margin = "0 auto";
     document.getElementById("inicio").hidden = true;
     hablar("");  // habilita la voz en el celular
