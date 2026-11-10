@@ -14,8 +14,8 @@ import joblib
 
 from comun import CAMARA, DetectorManos, DetectorCuerpo, Caracteristicas, dibujar_mano, dibujar_cuerpo, escribir, subtitulo, es_letra
 
-CUADROS_ESTABLES = 8       # cuántos cuadros seguidos tiene que ver la misma seña
-CONFIANZA_MINIMA = 0.50
+CUADROS_ESTABLES = 12      # cuántos cuadros seguidos tiene que ver la misma seña
+CONFIANZA_MINIMA = 0.70
 CUADROS_PARA_CERRAR_PALABRA = 20   # mano abajo ~0,7 s: termina el deletreo
 CUADROS_PARA_BORRAR = 150          # mano abajo ~5 s: se limpia el subtítulo
 VOZ_MAC = "Paulina"        # voz en español de la Mac si no hay grabación propia
