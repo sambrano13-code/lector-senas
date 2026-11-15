@@ -62,4 +62,4 @@ while True:
         break
 
 camara.release()
-cv2.destroyAllWindows()
+cv2.destroyAllWindows

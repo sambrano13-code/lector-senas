@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Modo Emergencias</title>
+<meta name="description" content="Tablero de comunicación para atender a una persona sorda en una emergencia.">
+<style>
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:#fff; color:#000; font-family:Arial, Helvetica, sans-serif; -webkit-tap-highlight-color:transparent; }
+  header { max-width:900px; margin:0 auto; padding:20px 16px 4px; }
+  h1 { margin:0; font-size:clamp(24px,5vw,34px); }
+  header p { margin:6px 0 0; color:#333; font-size:15px; }
+  nav.pestanas { position:sticky; top:0; z-index:5; background:#fff; border-bottom:1px solid #000; display:flex; max-width:900px; margin:12px auto 0; }
+  nav.pestanas button { flex:1; background:#fff; color:#000; border:0; border-bottom:4px solid transparent; padding:14px 6px; font:bold 16px Arial, sans-serif; cursor:pointer; }
+  nav.pestanas button.activa { border-bottom-color:#000; }
+  main { max-width:900px; margin:0 auto; padding:12px 16px 40px; }
+  h2 { font-size:15px; text-transform:uppercase; letter-spacing:.06em; margin:22px 0 10px; color:#333; }
+  .grilla { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; }
+  .boton { display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; background:#fff; color:#000;
+    border:2px solid #000; border-radius:14px; padding:14px; min-height:96px; font:bold 16px/1.25 Arial, sans-serif; cursor:pointer; }
+  .boton .ico { font-size:28px; line-height:1; }
+  .boton:active { background:#000; color:#fff; }
+  .boton.urgente { border-width:3px; }
+  textarea { width:100%; min-height:90px; border:2px solid #000; border-radius:14px; padding:12px; font:18px Arial, sans-serif; resize:vertical; }
+  .fila { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .simple { background:#fff; color:#000; border:2px solid #000; border-radius:999px; padding:12px 20px; font:bold 16px Arial, sans-serif; cursor:pointer; }
+  .simple.negro { background:#000; color:#fff; }
+  .aviso { border:1px solid #000; border-radius:12px; padding:12px 14px; font-size:14px; color:#333; margin-top:26px; line-height:1.45; }
+
+  /* Pantalla completa para mostrarle a la otra persona */
+  #pantalla { position:fixed; inset:0; z-index:20; background:#fff; display:flex; flex-direction:column; padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+  #pantalla .arriba { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  #pantalla .quien { font-size:14px; font-weight:bold; text-transform:uppercase; letter-spacing:.06em; color:#333; }
+  #pantalla .centro { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:14px; overflow:auto; padding:10px 0; }
+  #pIco { font-size:clamp(60px, 16vw, 110px); line-height:1; }
+  #pTexto { font-size:clamp(30px, 8vw, 64px); font-weight:bold; line-height:1.15; max-width:16ch; overflow-wrap:anywhere; }
+  #respuestas { display:grid; gap:10px; width:100%; max-width:700px; }
+  #respuestas.dos { grid-template-columns:1fr 1fr; }
+  #respuestas.tres { grid-template-columns:repeat(3, 1fr); }
+  #respuestas.cuerpo { grid-template-columns:repeat(2, 1fr); }
+  #respuestas.escala { grid-template-columns:repeat(6, minmax(0, 1fr)); }
+  #respuestas button { background:#fff; color:#000; border:3px solid #000; border-radius:16px; padding:18px 8px; font:bold clamp(18px, 4.5vw, 28px) Arial, sans-serif; cursor:pointer; }
+  #respuestas button:active { background:#000; color:#fff; }
+  #respuestas.escala button { padding:14px 4px; font-size:clamp(16px, 4vw, 24px); }
+  #respuestas .chico { display:block; font-size:11px; overflow-wrap:anywhere; font-weight:normal; margin-top:4px; }
+  #pRespuesta { font-size:clamp(34px, 9vw, 72px); font-weight:bold; border:4px solid #000; border-radius:18px; padding:16px 28px; }
+
+  /* Registro */
+  #lista { list-style:none; margin:0; padding:0; border:1px solid #000; border-radius:12px; }
+  #lista li { padding:12px 14px; border-bottom:1px solid #ddd; font-size:16px; line-height:1.4; }
+  #lista li:last-child { border-bottom:0; }
+  #lista .hora { font-size:13px; color:#555; }
+  #vacio { color:#555; font-size:15px; }
+  footer { text-align:center; color:#333; font-size:14px; padding:8px 16px 28px; }
+  footer a { color:#000; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚑 Modo Emergencias</h1>
+  <p>Para comunicarse con una persona sorda durante una urgencia. Tocá una frase y mostrale la pantalla.</p>
+</header>
+
+<nav class="pestanas">
+  <button data-tab="rescatista" class="activa">Rescatista</button>
+  <button data-tab="paciente">Paciente</button>
+  <button data-tab="registro">Registro <span id="contador"></span></button>
+</nav>
+
+<main>
+  <section id="tab-rescatista">
+    <h2>Presentarse y calmar</h2>
+    <div class="grilla" id="g-calmar"></div>
+    <h2>Preguntar</h2>
+    <div class="grilla" id="g-preguntar"></div>
+    <h2>Indicar</h2>
+    <div class="grilla" id="g-indicar"></div>
+  </section>
+
+  <section id="tab-paciente" hidden>
+    <h2>Lo que necesito</h2>
+    <div class="grilla" id="g-paciente"></div>
+    <h2>Escribir otra cosa</h2>
+    <textarea id="libre" placeholder="Escribí acá lo que quieras decir…"></textarea>
+    <div class="fila">
+      <button class="simple negro" id="btnMostrar">Mostrar en grande</button>
+      <a class="simple" href="index.html" style="text-decoration:none">🤟 Responder con señas (cámara)</a>
+    </div>
+  </section>
+
+  <section id="tab-registro" hidden>
+    <h2>Registro de la atención</h2>
+    <p id="vacio">Todavía no hay respuestas. Lo que la persona responda queda anotado acá, con la hora, para pasárselo al equipo del hospital.</p>
+    <ul id="lista"></ul>
+    <div class="fila">
+      <button class="simple negro" id="btnCopiar">Copiar registro</button>
+      <button class="simple" id="btnLimpiar">Empezar de nuevo</button>
+    </div>
+  </section>
+
+  <div class="aviso">
+    ⚠️ Herramienta de apoyo a la comunicación. No reemplaza los protocolos de atención ni a un intérprete de Lengua de Señas Argentina. En una emergencia, llamá al <b>107</b> (emergencias médicas) o al <b>911</b>.
+  </div>
+</main>
+
+<div id="pantalla" hidden>
+  <div class="arriba">
+    <span class="quien" id="pQuien"></span>
+    <button class="simple" id="btnCerrar">✕ Cerrar</button>
+  </div>
+  <div class="centro">
+    <div id="pIco"></div>
+    <div id="pTexto"></div>
+    <div id="respuestas"></div>
+    <div id="pRespuesta" hidden></div>
+  </div>
+</div>
+
+<footer>Parte del <a href="index.html">Lector de Lengua de Señas</a> · Hecho por <a href="https://linkedin.com/in/romina-sambrano" target="_blank">Romina Sambrano</a></footer>
+
+<script>
+// ---------- Respuestas posibles ----------
+const SI_NO = ["Sí", "No", "No sé"];
+const ENTENDI = ["Entendí", "No entendí"];
+const CUERPO = ["Cabeza", "Cuello", "Pecho", "Panza", "Espalda", "Brazo izquierdo", "Brazo derecho", "Pierna izquierda", "Pierna derecha", "Otro lugar"];
+const ESCALA = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+
+// ---------- Frases del rescatista ----------
+const FRASES = {
+  calmar: [
+    { ico:"👋", texto:"Soy paramédico/a. Vengo a ayudarte.", resp:ENTENDI },
+    { ico:"🤝", texto:"Tranquilo/a. Estás a salvo.", resp:ENTENDI },
+    { ico:"🧑‍🦻", texto:"¿Sos sordo/a?", resp:SI_NO },
+    { ico:"✍️", texto:"¿Preferís que escribamos?", resp:SI_NO },
+  ],
+  preguntar: [
+    { ico:"🤕", texto:"¿Te duele algo?", resp:SI_NO },
+    { ico:"📍", texto:"¿Dónde te duele?", resp:CUERPO, tipo:"cuerpo" },
+    { ico:"📊", texto:"¿Cuánto te duele?", resp:ESCALA, tipo:"escala" },
+    { ico:"🫁", texto:"¿Podés respirar bien?", resp:SI_NO, urgente:true },
+    { ico:"💥", texto:"¿Te golpeaste la cabeza?", resp:SI_NO },
+    { ico:"😵", texto:"¿Te desmayaste?", resp:SI_NO },
+    { ico:"💊", texto:"¿Sos alérgico/a a algún medicamento?", resp:SI_NO },
+    { ico:"💉", texto:"¿Tomás alguna medicación?", resp:SI_NO },
+    { ico:"❤️", texto:"¿Tenés alguna enfermedad? (corazón, diabetes, presión)", resp:SI_NO },
+    { ico:"🤰", texto:"¿Estás embarazada?", resp:SI_NO },
+    { ico:"📞", texto:"¿Querés que avisemos a alguien?", resp:SI_NO },
+  ],
+  indicar: [
+    { ico:"✋", texto:"Quedate quieto/a, por favor.", resp:ENTENDI },
+    { ico:"🔎", texto:"Te voy a revisar.", resp:ENTENDI },
+    { ico:"🩺", texto:"Te voy a tomar la presión.", resp:ENTENDI },
+    { ico:"🏥", texto:"Te vamos a llevar al hospital.", resp:ENTENDI },
+  ],
+};
+
+// ---------- Frases del paciente ----------
+const PACIENTE = [
+  { ico:"🆘", texto:"Necesito ayuda", urgente:true },
+  { ico:"🫁", texto:"No puedo respirar", urgente:true },
+  { ico:"🤕", texto:"Me duele mucho", urgente:true },
+  { ico:"🧑‍🦻", texto:"Soy sordo/a. Escribime o mostrame la pantalla." },
+  { ico:"🔁", texto:"No entendí. ¿Podés repetir?" },
+  { ico:"💧", texto:"Quiero agua" },
+  { ico:"🥶", texto:"Tengo frío" },
+  { ico:"🤢", texto:"Tengo ganas de vomitar" },
+  { ico:"🚻", texto:"Necesito ir al baño" },
+  { ico:"📞", texto:"Llamen a mi familia" },
+  { ico:"👍", texto:"Estoy bien" },
+  { ico:"🙏", texto:"Gracias" },
+];
+
+// ---------- Voz (para el rescatista que está ocupado) ----------
+function hablar(texto) {
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto.replace(/[^\p{L}\p{N}\s¿?¡!.,()/=-]/gu, "").trim());
+    const voces = speechSynthesis.getVoices();
+    u.voice = voces.find(v => v.lang === "es-AR") || voces.find(v => v.lang.startsWith("es")) || null;
+    u.lang = u.voice ? u.voice.lang : "es-AR";
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// ---------- Registro con hora ----------
+const registro = [];
+function anotar(texto) {
+  const hora = new Date().toLocaleTimeString("es-AR", { hour:"2-digit", minute:"2-digit" });
+  registro.push({ hora, texto });
+  dibujarRegistro();
+}
+function dibujarRegistro() {
+  const lista = document.getElementById("lista");
+  lista.innerHTML = "";
+  for (const r of registro) {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="hora">${r.hora}</div>`;
+    li.append(r.texto);
+    lista.append(li);
+  }
+  document.getElementById("vacio").hidden = registro.length > 0;
+  document.getElementById("contador").textContent = registro.length ? `(${registro.length})` : "";
+}
+
+// ---------- Pantalla grande ----------
+const pantalla = document.getElementById("pantalla");
+const elResp = document.getElementById("respuestas");
+const elRespFinal = document.getElementById("pRespuesta");
+
+function abrir({ quien, ico, texto, resp, tipo }) {
+  document.getElementById("pQuien").textContent = quien;
+  document.getElementById("pIco").textContent = ico || "";
+  document.getElementById("pTexto").textContent = texto;
+  elRespFinal.hidden = true;
+  elResp.innerHTML = "";
+  elResp.className = tipo || (resp && resp.length === 3 ? "tres" : "dos");
+  elResp.hidden = !resp;
+  for (const r of resp || []) {
+    const b = document.createElement("button");
+    b.textContent = r;
+    if (tipo === "escala" && (r === "0" || r === "10")) {
+      b.innerHTML = `${r}<span class="chico">${r === "0" ? "nada" : "muchísimo"}</span>`;
+    }
+    b.onclick = () => responder(texto, r);
+    elResp.append(b);
+  }
+  pantalla.hidden = false;
+}
+
+function responder(pregunta, respuesta) {
+  const limpia = respuesta;
+  elResp.hidden = true;
+  elRespFinal.textContent = respuesta;
+  elRespFinal.hidden = false;
+  hablar(limpia);
+  anotar(`${pregunta} → ${limpia}`);
+}
+
+document.getElementById("btnCerrar").onclick = () => { pantalla.hidden = true; speechSynthesis.cancel(); };
+
+// ---------- Armar botones ----------
+function crearBoton(f, alTocar) {
+  const b = document.createElement("button");
+  b.className = "boton" + (f.urgente ? " urgente" : "");
+  b.innerHTML = `<span class="ico">${f.ico}</span>`;
+  b.append(f.texto);
+  b.onclick = alTocar;
+  return b;
+}
+for (const grupo of ["calmar", "preguntar", "indicar"]) {
+  const cont = document.getElementById("g-" + grupo);
+  for (const f of FRASES[grupo]) {
+    cont.append(crearBoton(f, () => abrir({ quien:"El rescatista te dice:", ...f })));
+  }
+}
+const gPac = document.getElementById("g-paciente");
+for (const f of PACIENTE) {
+  gPac.append(crearBoton(f, () => {
+    abrir({ quien:"La persona dice:", ico:f.ico, texto:f.texto });
+    hablar(f.texto);
+    anotar(`Paciente: ${f.texto}`);
+  }));
+}
+document.getElementById("btnMostrar").onclick = () => {
+  const t = document.getElementById("libre").value.trim();
+  if (!t) return;
+  abrir({ quien:"La persona dice:", ico:"✍️", texto:t });
+  hablar(t);
+  anotar(`Paciente (escrito): ${t}`);
+};
+
+// ---------- Pestañas ----------
+document.querySelectorAll("nav.pestanas button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll("nav.pestanas button").forEach(b => b.classList.toggle("activa", b === btn));
+    for (const t of ["rescatista", "paciente", "registro"]) {
+      document.getElementById("tab-" + t).hidden = t !== btn.dataset.tab;
+    }
+  };
+});
+
+// ---------- Registro: copiar y limpiar ----------
+document.getElementById("btnCopiar").onclick = async (e) => {
+  const texto = "Registro de atención (Modo Emergencias)\n" + registro.map(r => `${r.hora} - ${r.texto}`).join("\n");
+  try { await navigator.clipboard.writeText(texto); e.target.textContent = "¡Copiado!"; }
+  catch { e.target.textContent = "No se pudo copiar"; }
+  setTimeout(() => e.target.textContent = "Copiar registro", 2000);
+};
+document.getElementById("btnLimpiar").onclick = () => { registro.length = 0; dibujarRegistro(); };
+
+// En iPhone la voz se habilita con el primer toque
+document.addEventListener("touchend", () => { try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch (e) {} }, { once:true });
+</script>
+</body>
+</html>

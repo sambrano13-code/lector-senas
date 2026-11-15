@@ -16,6 +16,16 @@ Reconoce el **abecedario completo** (A–Z, con Ñ) y las palabras **Hola, Mi no
 
 **Precisión:** ~98% en ejemplos que el modelo no vio durante el entrenamiento.
 
+## 🚑 Modo emergencias
+
+Tablero de comunicación para atender a una persona sorda en una urgencia (`docs/emergencias.html`):
+
+- **Rescatista:** frases listas para presentarse, preguntar e indicar ("¿Dónde te duele?", "¿Podés respirar bien?", "¿Sos alérgico/a a algún medicamento?"). La persona responde tocando *Sí / No / No sé*, una parte del cuerpo o una escala de dolor del 0 al 10.
+- **Paciente:** botones para pedir lo que necesita ("No puedo respirar", "Llamen a mi familia") o escribir libremente. Se muestra en grande y se lee en voz alta.
+- **Registro:** cada respuesta queda anotada con la hora, para copiarla y pasársela al equipo del hospital.
+
+> Herramienta de apoyo: no reemplaza los protocolos de atención ni a un intérprete de LSA.
+
 ## Tecnologías
 
 Python · MediaPipe · OpenCV · scikit-learn · NumPy · Pillow
